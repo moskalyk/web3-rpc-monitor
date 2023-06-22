@@ -1,3 +1,4 @@
 /node_modules
 /socket/node_modules
 /socket/.env
+/client/node_modules
