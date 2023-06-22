@@ -2,11 +2,12 @@ import * as dotenv from "dotenv";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { ethers } from 'ethers'
-import {fetch} from 'cross-fetch'
+import { fetch } from 'cross-fetch'
 
 dotenv.config();
 
 const httpServer = createServer();
+
 const io = new Server(httpServer, {
     cors: {
       origin: "http://localhost:3001",
@@ -15,7 +16,6 @@ const io = new Server(httpServer, {
   });
 
 io.on("connection", (socket) => {
-  // ...
   console.log('connected')
 });
 
@@ -36,24 +36,17 @@ provider_urls.map((url: string) => {
 
 setInterval(async () => {
     const blocks: any = []
-    let i = 0
     try {
-        for(; i < providers.length; i++){
-            blocks.push(await providers[i].getBlockNumber())
-        }
-
+        for(let i = 0; i < providers.length; i++) blocks.push(await providers[i].getBlockNumber())
         const res = await fetch('https://polygon-indexer.sequence.app/status')
         const json = (await res.json())
-        console.log(json)
         blocks.push(json.checks.lastBlockNum)
-
         io.sockets.emit("data", {
             date: Date.now(), 
             blocks: blocks,
             max: Math.max(...blocks)
         });
     }catch(err){
-        console.log(i)
         console.log(err)
     }
 }, 2000)
