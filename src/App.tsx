@@ -20,7 +20,7 @@ const chartColors = {
 let labels: any = []
 
 const BlockCounts = () => {
-  const socket = io('ws://localhost:5000');
+  const socket = io('ws://216.128.182.90:5000');
   const [data, setData] = React.useState<any>([])
   const [blockCount, setBlockCount] = React.useState<any>(0)
 
@@ -108,7 +108,7 @@ const BlockCounts = () => {
 
   return(
     <>
-      <p style={{textAlign: 'center', width: '100%'}}>in the # of blocks {blockCount}</p>{}
+      <p style={{textAlign: 'center', width: '100%'}}>behind during # of blocks {blockCount}</p>{}
       <Bar options={options} data={data} />
     </>
   )
@@ -117,7 +117,7 @@ const BlockCounts = () => {
 function App() {
   const [init, setInit] = React.useState<any>(false)
   const [nav, setNav] = React.useState<any>(0)
-  const socket = io('ws://localhost:5000');
+  const socket = io('ws://216.128.182.90:5000');
 
   const [chartData, setChartData] = React.useState<any>({
     labels: [],
@@ -235,7 +235,7 @@ function App() {
   return (
     <div className="App">
       <h1 style={{textAlign: 'center'}}>web3 RPC monitor</h1>
-      <p style={{textAlign: 'center', marginLeft: '-70px', cursor: 'pointer'}} onClick={() => setNav(1)}><span>block counts &nbsp;&nbsp;&nbsp;</span>|<span onClick={() => setNav(1)}>&nbsp;&nbsp;&nbsp; live</span></p>
+      <p style={{textAlign: 'center', marginLeft: '-70px', cursor: 'pointer'}} onClick={() => setNav(1)}><span>block counts &nbsp;&nbsp;&nbsp;</span>|<span onClick={() => setNav(0)}>&nbsp;&nbsp;&nbsp; live</span></p>
       <br/>
       {Compass(nav)}
     </div>
