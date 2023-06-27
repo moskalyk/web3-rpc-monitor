@@ -56,8 +56,6 @@ setInterval(async () => {
 
 const getRatios = () => {
     let ratios: any = []
-    let prior = Math.max(...chains[0].blocks)
-    let last = Math.max(...chains[chains.length - 1].blocks)
     provider_urls.map((_: any, i: any) => {
         let count = 0
         chains.map((chain: any) => {
@@ -66,28 +64,24 @@ const getRatios = () => {
         })
         ratios.push( count )
     })
-
-    return [ratios, chains.length]
+    return [ratios]
 }
 
 setInterval(async () => {
     const blocks: any = []
     try {
-        chains = chains.slice(-(1*60*60*24/2))
-        const [ratios, length] = getRatios()
-
+        chains = chains.slice(-(1*60*60/2))
+        const [ratios] = getRatios()
         io.sockets.emit("live", {
-            ratios: ratios,
-            blocks: length
+            ratios: ratios
         });
     }catch(err){
         console.log(err)
     }
-}, 5000)
+}, 2000)
 
 setInterval(async () => {
     const blocks: any = []
-
     try {
         let day: any = {
             0: [],
