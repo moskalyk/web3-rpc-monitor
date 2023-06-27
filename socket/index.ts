@@ -10,7 +10,7 @@ const httpServer = createServer();
 
 const io = new Server(httpServer, {
     cors: {
-      origin: "http://localhost:3001",
+      origin: "*",
       methods: ["GET", "POST"]
     }
   });
@@ -47,7 +47,8 @@ setInterval(async () => {
             blocks: blocks,
             max: Math.max(...blocks)
         });
-        chains.push(blocks)
+        chains.push({blocks: blocks, time: new Date().toLocaleTimeString() } )
+        console.log(`polling... #${Math.max(...blocks)}`)
     }catch(err){
         console.log(err)
     }
@@ -55,34 +56,65 @@ setInterval(async () => {
 
 const getRatios = () => {
     let ratios: any = []
-    let prior = Math.max(...chains[0])
-    console.log('prior: ', prior)
-
-    let last = Math.max(...chains[chains.length - 1])
-    console.log('last: ', last)
-
+    let prior = Math.max(...chains[0].blocks)
+    let last = Math.max(...chains[chains.length - 1].blocks)
     provider_urls.map((_: any, i: any) => {
         let count = 0
-        chains.map((blocks: any) => {
-            const maxHeight = Math.max(...blocks)
-            count += Math.abs(blocks[i]-maxHeight)
+        chains.map((chain: any) => {
+            const maxHeight = Math.max(...chain.blocks)
+            count += Math.abs(chain.blocks[i]-maxHeight)
         })
         ratios.push( count )
     })
 
     return [ratios, chains.length]
 }
+
 setInterval(async () => {
     const blocks: any = []
     try {
-        chains = chains.slice(-(1*60*60/2))
-        console.log(1*60*60/2)
+        chains = chains.slice(-(1*60*60*24/2))
         const [ratios, length] = getRatios()
 
         io.sockets.emit("live", {
             ratios: ratios,
             blocks: length
         });
+    }catch(err){
+        console.log(err)
+    }
+}, 5000)
+
+setInterval(async () => {
+    const blocks: any = []
+
+    try {
+        let day: any = {
+            0: [],
+            1: [],
+            2: [],
+            3: [],
+            4: [],
+            5: [],
+        }
+
+        let time: any = []
+        
+        chains.map((chain: any, i: any) => {
+            day[0].push(chain.blocks[0])
+            day[1].push(chain.blocks[1])
+            day[2].push(chain.blocks[2])
+            day[3].push(chain.blocks[3])
+            day[4].push(chain.blocks[4])
+            day[5].push(chain.blocks[5])
+            time.push(chain.time)
+        })
+
+        io.sockets.emit("day", {
+            blocks: day,
+            time: time
+        });
+        
     }catch(err){
         console.log(err)
     }

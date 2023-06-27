@@ -117,10 +117,117 @@ const BlockCounts = () => {
   )
 }
 
+let count = 0
 function LastDay (props: any) {
+  const socket = io('ws://216.128.182.90:5000');
+  const [init, setInit] = React.useState<any>(false)
+
+  const [chartData, setChartData] = React.useState<any>({
+    labels: [],
+    datasets: [
+      {
+        label: 'Sequence',
+        data: [],
+        fill: false,
+        borderColor: 'black',
+        tension: 0.1,
+      },
+      {
+        label: 'Alchemy',
+        data: [],
+        fill: false,
+        borderColor: 'blue',
+        tension: 0.1,
+      },
+      {
+        label: 'Infura',
+        data: [],
+        fill: false,
+        borderColor: 'orange',
+        tension: 0.1,
+      },
+      {
+        label: 'Quicknode',
+        data: [],
+        fill: false,
+        borderColor: 'cyan',
+        tension: 0.1,
+      },
+      {
+        label: 'Polygon',
+        data: [],
+        fill: false,
+        borderColor: 'purple',
+        tension: 0.1,
+      },
+      {
+        label: 'Ankr',
+        data: [],
+        fill: false,
+        borderColor: 'lightblue',
+        tension: 0.1,
+      },
+      {
+        label: 'Sequence Indexer',
+        data: [],
+        fill: false,
+        borderColor: 'pink',
+        tension: 0.1,
+      }
+    ],
+  });
+
+  React.useEffect(() => {
+        socket.on('day', (packet: any) => {
+          console.log(packet.blocks[0])
+      if(!init){
+        console.log('tester ')
+
+          // labels = [...(labels).slice(-1800), new Date().toLocaleTimeString()];
+        // console.log(chartData)
+        if(count <= 0){
+          setChartData({
+            labels: packet.time,
+            datasets: [
+
+              {
+                ...chartData.datasets[0],
+                data: [...chartData.datasets[0].data, ...packet.blocks[0]],
+              },
+              {
+                ...chartData.datasets[1],
+                data: [...chartData.datasets[1].data, ...packet.blocks[1]],
+              },
+              {
+                ...chartData.datasets[2],
+                data: [...chartData.datasets[2].data, ...packet.blocks[2]],
+              },
+              {
+                ...chartData.datasets[3],
+                data: [...chartData.datasets[3].data, ...packet.blocks[3]],
+              },
+              {
+                ...chartData.datasets[4],
+                data: [...chartData.datasets[4].data, ...packet.blocks[4]],
+              },
+              {
+                ...chartData.datasets[5],
+                data: [...chartData.datasets[5].data, ...packet.blocks[5]],
+              }
+            ],
+          });
+        }
+        count++
+
+        setInit(true)
+      }
+
+        })
+    }, [init])
   return(
     <>
-      in the last day
+      <p>in the last #{chartData.datasets[0].data.length} blocks</p>
+      <Line data={chartData} />
     </>
   )
 }
@@ -243,8 +350,8 @@ function App() {
       case 1:
         navigator = <BlockCounts />
         break;
-      case 1:
-        navigator = <LastDay />
+      case 2:
+        navigator = <LastDay/>
         break;
     }
     return navigator
@@ -265,7 +372,7 @@ function App() {
       <br/>
       <br/>
       <h1 className="title">polygon RPC monitor</h1>
-      <p className="title" style={{textAlign: 'center', marginLeft: '-60px', cursor: 'pointer'}}><span onClick={() => setNav(1)}>block counts &nbsp;&nbsp;&nbsp;/</span><span onClick={() => setNav(0)}>&nbsp;&nbsp;&nbsp; live</span><span onClick={() => setNav(2)}>&nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; day</span></p>
+      <p className="title" style={{textAlign: 'center', marginLeft: '-60px', cursor: 'pointer'}}><span onClick={() => {setInit(false);setNav(1)}}>block counts &nbsp;&nbsp;&nbsp;/</span><span onClick={() => {setInit(false);setNav(0)}}>&nbsp;&nbsp;&nbsp; live</span><span onClick={() => {setInit(false);setNav(2)}}>&nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; day</span></p>
       <br/>
       {Compass(nav)}
     </div>
