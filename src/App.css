@@ -36,3 +36,17 @@
     transform: rotate(360deg);
   }
 }
+
+.title {
+  font-family: 'Arcade' !important;
+  text-align: 'center';
+  font-weight: 200;
+}
+
+canvas {
+  padding: 10px 100px 100px 100px;
+}
+
+body {
+  background: aqua;
+}

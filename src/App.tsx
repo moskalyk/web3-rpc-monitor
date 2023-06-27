@@ -4,6 +4,9 @@ import "chartjs-plugin-streaming";
 import moment from "moment";
 import { io } from 'socket.io-client';
 import { Bar } from 'react-chartjs-2';
+import './App.css'
+
+import { Box, Card, Text, Button, useTheme, SunIcon, IconButton} from '@0xsequence/design-system'
 
 const Chart = require("react-chartjs-2").Chart;
 
@@ -114,6 +117,14 @@ const BlockCounts = () => {
   )
 }
 
+function LastDay (props: any) {
+  return(
+    <>
+      in the last day
+    </>
+  )
+}
+
 function App() {
   const [init, setInit] = React.useState<any>(false)
   const [nav, setNav] = React.useState<any>(0)
@@ -220,22 +231,41 @@ function App() {
     }
   }, [chartData]);
 
+  const {theme, setTheme} = useTheme()
+
   const Compass = (nav: any) => {
     let navigator;
+    console.log(nav)
     switch(nav){
       case 0:
         navigator = <Line data={chartData} />
         break;
       case 1:
         navigator = <BlockCounts />
+        break;
+      case 1:
+        navigator = <LastDay />
+        break;
     }
     return navigator
   }
 
+  React.useEffect(() => {
+
+  }, [nav])
+
   return (
     <div className="App">
-      <h1 style={{textAlign: 'center'}}>web3 RPC monitor</h1>
-      <p style={{textAlign: 'center', marginLeft: '-70px', cursor: 'pointer'}} onClick={() => setNav(1)}><span>block counts &nbsp;&nbsp;&nbsp;</span>|<span onClick={() => setNav(0)}>&nbsp;&nbsp;&nbsp; live</span></p>
+      <Box gap='6'>
+        <IconButton style={{position: 'fixed', top: '20px', right: '20px'}} icon={SunIcon} onClick={() => {
+          setTheme(theme == 'dark' ? 'light' : 'dark')
+        }}/>
+      </Box>
+      <br/>
+      <br/>
+      <br/>
+      <h1 className="title">polygon RPC monitor</h1>
+      <p className="title" style={{textAlign: 'center', marginLeft: '-60px', cursor: 'pointer'}}><span onClick={() => setNav(1)}>block counts &nbsp;&nbsp;&nbsp;/</span><span onClick={() => setNav(0)}>&nbsp;&nbsp;&nbsp; live</span><span onClick={() => setNav(2)}>&nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; day</span></p>
       <br/>
       {Compass(nav)}
     </div>
