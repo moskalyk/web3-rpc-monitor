@@ -38,6 +38,9 @@ dependencies:
   framer-motion:
     specifier: ^10.12.17
     version: 10.12.17(react-dom@18.2.0)(react@18.2.0)
+  libphonenumber-js:
+    specifier: ^1.10.37
+    version: 1.10.37
   moment:
     specifier: ^2.29.4
     version: 2.29.4
@@ -7789,6 +7792,10 @@ packages:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
+    dev: false
+
+  /libphonenumber-js@1.10.37:
+    resolution: {integrity: sha512-Z10PCaOCiAxbUxLyR31DNeeNugSVP6iv/m7UrSKS5JHziEMApJtgku4e9Q69pzzSC9LnQiM09sqsGf2ticZnMw==}
     dev: false
 
   /lilconfig@2.1.0:

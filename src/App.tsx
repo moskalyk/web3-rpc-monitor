@@ -5,8 +5,8 @@ import moment from "moment";
 import { io } from 'socket.io-client';
 import { Bar } from 'react-chartjs-2';
 import './App.css'
-
 import { Box, Card, Text, Button, useTheme, SunIcon, IconButton} from '@0xsequence/design-system'
+import { isValidNumber } from 'libphonenumber-js';
 
 const Chart = require("react-chartjs-2").Chart;
 
@@ -96,7 +96,7 @@ const BlockCounts = () => {
         datasets: [
           {
             label: 'Blocks',
-            data: packet.ratios.sort((a: any, b: any) => a - b),
+            data: packet.ratios,
             backgroundColor: 'rgba(255, 99, 132, 0.5)',
           }
         ],
@@ -232,6 +232,61 @@ function LastDay (props: any) {
   )
 }
 
+function isValidPhoneNumber(phoneNumber: any) {
+  // Check if the phone number is valid
+  const isValid = isValidNumber(phoneNumber);
+
+  return isValid;
+}
+
+
+function SignUp(props: any) {
+  const [number, setNumber] = React.useState<any>('')
+  const [error, setError] = React.useState<any>('')
+  const [success, setSuccess] = React.useState<any>(null)
+  const signUp = async () => {
+    console.log(number)
+    if(isValidPhoneNumber(number)){
+      console.log('is valid')
+      const res = await fetch('http://localhost:4000/signUp', {
+        method: "post",
+        headers: {
+            "content-type": "application/json",
+          },
+        //make sure to serialize your JSON body
+        body: JSON.stringify({
+          number: number,
+        })
+      })
+      if(res.status == 200){
+        setSuccess(<span>success <br/><br/> expect to recieve a notification when blocks are behind by 20<br/><br/>with a cool down of 10 min</span>)
+        setError(null)
+      } else {
+        setError(<p className="error">there was an error adding your number</p>)
+      }
+    } else {
+      setError(<p className="error">incorrect number<br/> make sure to use + and area code</p>)
+    }
+  }
+
+  React.useEffect(() => {}, [error])
+
+  return (
+    <>
+      <br/>
+      <p className="title">sign up to recieve a text message</p><br/><p className="title"> when Sequence is behind by over 20 blocks</p>
+      <br/>
+      <br/>
+      { !success ? <input placeholder="phone number" onChange={(evt) => setNumber(evt.target.value)}></input> : null }
+      <br/>
+      <br/>
+      {success}
+      {error}
+      <br/>
+      { !success ? <Button label='sign up' onClick={() => signUp()}></Button> : null }
+    </>
+  )
+}
 function App() {
   const [init, setInit] = React.useState<any>(false)
   const [nav, setNav] = React.useState<any>(0)
@@ -353,6 +408,9 @@ function App() {
       case 2:
         navigator = <LastDay/>
         break;
+      case 3:
+        navigator = <SignUp/>
+        break;
     }
     return navigator
   }
@@ -372,7 +430,8 @@ function App() {
       <br/>
       <br/>
       <h1 className="title">polygon RPC monitor</h1>
-      <p className="title" style={{textAlign: 'center', marginLeft: '-60px', cursor: 'pointer'}}><span onClick={() => {setInit(false);setNav(1)}}>block counts &nbsp;&nbsp;&nbsp;/</span><span onClick={() => {setInit(false);setNav(0)}}>&nbsp;&nbsp;&nbsp; live</span><span onClick={() => {setInit(false);setNav(2)}}>&nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; day</span></p>
+      <br/>
+      <p className="title" style={{textAlign: 'center', marginLeft: '-60px', cursor: 'pointer'}}><span onClick={() => {setInit(false);setNav(1)}}>block counts &nbsp;&nbsp;&nbsp;/</span><span onClick={() => {window.location.reload();setInit(false);setNav(0)}}>&nbsp;&nbsp;&nbsp; live</span><span onClick={() => {setInit(false);setNav(2)}}>&nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; 1 hr</span><span onClick={() => {setInit(false);setNav(3)}}>&nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; notifications</span></p>
       <br/>
       {Compass(nav)}
     </div>
