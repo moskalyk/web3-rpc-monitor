@@ -259,7 +259,7 @@ function SignUp(props: any) {
         })
       })
       if(res.status == 200){
-        setSuccess(<span>success <br/><br/> expect to recieve a notification when blocks are behind by 20<br/><br/>with a cool down of 10 min</span>)
+        setSuccess(<span className="title">success <br/><br/> expect to receive a notification when blocks are behind by 20<br/><br/>with a cool down of 10 min</span>)
         setError(null)
       } else {
         setError(<p className="error">there was an error adding your number</p>)
@@ -274,7 +274,7 @@ function SignUp(props: any) {
   return (
     <>
       <br/>
-      <p className="title">sign up to recieve a text message</p><br/><p className="title"> when Sequence is behind by over 20 blocks</p>
+      { !success ? <><p className="title">sign up to recieve a text message</p><br/><p className="title"> when Sequence is behind by over 20 blocks</p></> : null }
       <br/>
       <br/>
       { !success ? <input placeholder="phone number" onChange={(evt) => setNumber(evt.target.value)}></input> : null }
