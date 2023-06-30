@@ -21,9 +21,9 @@ const chartColors = {
 };
 
 let labels: any = []
-
+let SOCKET_URL = 'ws://localhost:8000'
 const BlockCounts = () => {
-  const socket = io('ws://216.128.182.90:5000');
+  // const socket = io(SOCKET_URL);
   const [data, setData] = React.useState<any>([])
   const [blockCount, setBlockCount] = React.useState<any>(0)
 
@@ -43,7 +43,16 @@ const BlockCounts = () => {
 
   React.useEffect(() => {
 
-    socket.on('live', (packet: any) => {
+    const newSocket = new WebSocket('ws://localhost:5000/ws');
+
+    // Set up event handlers for the WebSocket connection
+    newSocket.onopen = () => {
+      console.log('WebSocket connection established');
+    };
+
+    newSocket.onmessage = (event) => {
+      // const message = event.data;
+      console.log(JSON.parse(event.data));
       const fullLabels = [
         {
           label: 'Sequence',
@@ -57,13 +66,6 @@ const BlockCounts = () => {
           data: [],
           fill: false,
           borderColor: 'blue',
-          tension: 0.1,
-        },
-        {
-          label: 'Infura',
-          data: [],
-          fill: false,
-          borderColor: 'orange',
           tension: 0.1,
         },
         {
@@ -91,20 +93,80 @@ const BlockCounts = () => {
 
       const labels = fullLabels.map((label: any) => label.label)
       
-      const data0 = {
-        labels,
-        datasets: [
-          {
-            label: 'Blocks',
-            data: packet.ratios,
-            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-          }
-        ],
-      };
-      console.log(packet)
-      setData(data0)
-      setBlockCount(packet.blocks)
-    })
+      // const data0 = {
+      //   labels,
+      //   datasets: [
+      //     {
+      //       label: 'Blocks',
+      //       data: packet.ratios,
+      //       backgroundColor: 'rgba(255, 99, 132, 0.5)',
+      //     }
+      //   ],
+      // };
+      // console.log(packet)
+      // setData(data0)
+      // setBlockCount(packet.blocks)
+    };
+
+    // socket.on('data', (packet: any) => {
+    //   console.log(packet)
+    // })
+
+    // socket.on('live', (packet: any) => {
+    //   const fullLabels = [
+    //     {
+    //       label: 'Sequence',
+    //       data: [],
+    //       fill: false,
+    //       borderColor: 'black',
+    //       tension: 0.1,
+    //     },
+    //     {
+    //       label: 'Alchemy',
+    //       data: [],
+    //       fill: false,
+    //       borderColor: 'blue',
+    //       tension: 0.1,
+    //     },
+    //     {
+    //       label: 'Quicknode',
+    //       data: [],
+    //       fill: false,
+    //       borderColor: 'cyan',
+    //       tension: 0.1,
+    //     },
+    //     {
+    //       label: 'Polygon',
+    //       data: [],
+    //       fill: false,
+    //       borderColor: 'purple',
+    //       tension: 0.1,
+    //     },
+    //     {
+    //       label: 'Ankr',
+    //       data: [],
+    //       fill: false,
+    //       borderColor: 'lightblue',
+    //       tension: 0.1,
+    //     }
+    //   ]
+
+    //   const labels = fullLabels.map((label: any) => label.label)
+      
+    //   const data0 = {
+    //     labels,
+    //     datasets: [
+    //       {
+    //         label: 'Blocks',
+    //         data: packet.ratios,
+    //         backgroundColor: 'rgba(255, 99, 132, 0.5)',
+    //       }
+    //     ],
+    //   };
+    //   console.log(packet)
+    //   setData(data0)
+    //   setBlockCount(packet.blocks)
+    // })
   })
 
  
@@ -119,7 +181,7 @@ const BlockCounts = () => {
 
 let count = 0
 function LastDay (props: any) {
-  const socket = io('ws://216.128.182.90:5000');
+  const socket = io(SOCKET_URL);
   const [init, setInit] = React.useState<any>(false)
 
   const [chartData, setChartData] = React.useState<any>({
@@ -137,13 +199,6 @@ function LastDay (props: any) {
         data: [],
         fill: false,
         borderColor: 'blue',
-        tension: 0.1,
-      },
-      {
-        label: 'Infura',
-        data: [],
-        fill: false,
-        borderColor: 'orange',
         tension: 0.1,
       },
       {
@@ -290,7 +345,7 @@ function SignUp(props: any) {
 function App() {
   const [init, setInit] = React.useState<any>(false)
   const [nav, setNav] = React.useState<any>(0)
-  const socket = io('ws://216.128.182.90:5000');
+  const socket = io(SOCKET_URL);
 
   const [chartData, setChartData] = React.useState<any>({
     labels: [],
@@ -307,13 +362,6 @@ function App() {
         data: [],
         fill: false,
         borderColor: 'blue',
-        tension: 0.1,
-      },
-      {
-        label: 'Infura',
-        data: [],
-        fill: false,
-        borderColor: 'orange',
         tension: 0.1,
       },
       {
@@ -350,9 +398,16 @@ function App() {
   React.useEffect(() => {
     if(!init){
 
-      socket.on('data', (packet: any) => {
+    const newSocket = new WebSocket('ws://localhost:5000/ws');
+
+    // Set up event handlers for the WebSocket connection
+    newSocket.onopen = () => {
+      console.log('WebSocket connection established');
+    };
+
+    newSocket.onmessage = (event) => {
+      let packet = JSON.parse(event.data);
         labels = [...(labels).slice(-10), new Date().toLocaleTimeString()];
-        // console.log(chartData)
         setChartData({
           labels: labels,
           datasets: [
@@ -380,14 +435,10 @@ function App() {
             {
               ...chartData.datasets[5],
               data: [...chartData.datasets[5].data.slice(-10), packet.blocks[5]-packet.max],
-            },
-            {
-              ...chartData.datasets[6],
-              data: [...chartData.datasets[6].data.slice(-10), packet.blocks[6]-packet.max],
-            },
+            }
           ],
         });
-      });
+      };
 
       setInit(true)
     }
