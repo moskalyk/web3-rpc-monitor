@@ -10,27 +10,84 @@ import (
 	"github.com/gorilla/websocket"
 	"math/big"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/joho/godotenv"
 )
 
 var (
 	upgrader  = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			// Replace with the origin of your React app
-			allowedOrigin := "http://localhost:3000"
-	
-			return r.Header.Get("Origin") == allowedOrigin
+			// allowedOrigin := "http://localhost:3000"
+			return true
 		},
 	}
 	clients   = make(map[*websocket.Conn]bool)
+	clientsBlockCounts   = make(map[*websocket.Conn]bool)
 	broadcast = make(chan []byte)
 )
 
-type Data struct {
+type BlockCountData struct {
+	Counts []*big.Int `json:"counts"`
+}
+
+type BlockObject struct {
 	Blocks []*big.Int `json:"blocks"`
-	Max *big.Int `json:"max"`
+	MaxNumber *big.Int `json:"max"`
+}
+
+func calculateDifferences(blockObjects []BlockObject) []*big.Int {
+	differences := make([]*big.Int, 0)
+
+	// init new big.int
+	diffs_sequence := big.NewInt(0)
+	diffs_alchemy := big.NewInt(0)
+	diffs_quicknode := big.NewInt(0)
+	diffs_polygon := big.NewInt(0)
+	diffs_ankr := big.NewInt(0)
+
+	for _, blockObj := range blockObjects {
+		var diffs []*big.Int
+
+		// init new big.int
+		diffs_max_sequence := big.NewInt(0)
+		diffs_max_alchemy := big.NewInt(0)
+		diffs_max_quicknode := big.NewInt(0)
+		diffs_max_polygon := big.NewInt(0)
+		diffs_max_ankr := big.NewInt(0)
+
+		// sub max - block
+		diffs_max_sequence.Sub(blockObj.MaxNumber, blockObj.Blocks[0])
+		diffs_max_alchemy.Sub(blockObj.MaxNumber, blockObj.Blocks[1])
+		diffs_max_quicknode.Sub(blockObj.MaxNumber, blockObj.Blocks[2])
+		diffs_max_polygon.Sub(blockObj.MaxNumber, blockObj.Blocks[3])
+		diffs_max_ankr.Sub(blockObj.MaxNumber, blockObj.Blocks[4])
+
+		// diffs += max_diffs
+		diffs_sequence.Add(diffs_sequence, diffs_max_sequence)
+		diffs_alchemy.Add(diffs_alchemy, diffs_max_alchemy)
+		diffs_quicknode.Add(diffs_quicknode, diffs_max_quicknode)
+		diffs_polygon.Add(diffs_polygon, diffs_max_polygon)
+		diffs_ankr.Add(diffs_ankr, diffs_max_ankr)
+
+		// create array
+		diffs = append(diffs, diffs_sequence)
+		diffs = append(diffs, diffs_alchemy)
+		diffs = append(diffs, diffs_quicknode)
+		diffs = append(diffs, diffs_polygon)
+		diffs = append(diffs, diffs_ankr)
+
+		// return
+		differences = diffs
+	}
+
+	return differences
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	myArray := []string{
 		os.Getenv("SEQUENCE_RPC"),
 		os.Getenv("ALCHEMY_RPC"),
@@ -39,7 +96,60 @@ func main() {
 		os.Getenv("ANKR_RPC"),
 	}
 	
-	var chains [][]*big.Int
+	var chains []BlockObject
+
+	// WebSocket endpoint
+	http.HandleFunc("/counts", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println("Failed to upgrade WebSocket connection:", err)
+			return
+		}
+
+		defer conn.Close()
+
+		log.Println("WebSocket client connected block counts:", conn.RemoteAddr())
+
+		// Add new client to the list
+		clientsBlockCounts[conn] = true
+
+		for {
+			if err != nil {
+				log.Println("Failed to read message from WebSocket client:", err)
+				break
+			}
+		}
+		delete(clientsBlockCounts, conn)
+	})
+
+	go func() {
+		for {
+
+			differences := calculateDifferences(chains)
+
+			data := BlockCountData{
+				Counts: differences,
+			}
+
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+
+			}
+
+			// Iterate over connected clients and send the message
+			for client := range clientsBlockCounts {
+				err := client.WriteMessage(websocket.TextMessage, jsonData)
+				if err != nil {
+					log.Println("Failed to send message to WebSocket client:", err)
+					client.Close()
+					delete(clientsBlockCounts, client)
+				}
+			}
+
+			time.Sleep(2*time.Second)
+		}
+	}()
+
 
 	// WebSocket endpoint
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -49,27 +159,9 @@ func main() {
 			return
 		}
 		defer conn.Close()
-
 		log.Println("WebSocket client connected:", conn.RemoteAddr())
-
 		// Add new client to the list
 		clients[conn] = true
-
-		// Handle incoming messages from the WebSocket client
-		for {
-			// _, msg, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("Failed to read message from WebSocket client:", err)
-				break
-			}
-
-			// Broadcast the received message to all connected clients
-			message := []byte("Hello, clients!")
-			broadcast <- message
-			time.Sleep(2 * time.Second)
-		}
-
-		// Remove the client from the list when connection is closed
 		delete(clients, conn)
 	})
 
@@ -78,7 +170,7 @@ func main() {
 		for {
 			if(len(chains) > 0){
 
-				blocks := chains[len(chains)-1]
+				blocks := chains[len(chains)-1].Blocks
 				max := blocks[0] // Assume the first element as the initial maximum
 
 				for _, num := range blocks {
@@ -87,9 +179,9 @@ func main() {
 					}
 				}
 
-				data := Data{
-					Blocks: chains[len(chains)-1],
-					Max: max,
+				data := BlockObject{
+					Blocks: chains[len(chains)-1].Blocks,
+					MaxNumber: max,
 				}
 
 				jsonData, err := json.Marshal(data)
@@ -114,14 +206,12 @@ func main() {
 		}
 	}()
 
-	log.Println("WebSocket server started")
 	go func() {
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
 			var blocks [] *big.Int
-			for index, value := range myArray {
-				log.Println("Index:", index, "Value:", value)
+			for _, value := range myArray {
 				client, err := ethclient.Dial(value)
 
 				if err != nil {
@@ -137,17 +227,31 @@ func main() {
 
 				blockNumber := header.Number
 				blocks = append(blocks, blockNumber)
-				log.Println("Latest block number:", blockNumber)
-				log.Println("Array:", chains)
 			}
-			chains = append(chains, blocks)
-			if len(chains) > 4 {
-				chains = chains[len(chains)-4:]
+
+			max := blocks[0] // Assume the first element as the initial maximum
+
+			for _, num := range blocks {
+				if num.Cmp(max) == 1 {
+					max = num // Update the maximum value
+				}
+			}
+
+			data := BlockObject{
+				Blocks: blocks,
+				MaxNumber: max,
+			}
+
+			chains = append(chains, data)
+			if len(chains) > 1800 {
+				chains = chains[len(chains)-1800:]
 			}
 		}
 	}()
 
-	err := http.ListenAndServe(":5000", nil)
+	err = http.ListenAndServe(":5000", nil)
+	log.Println("WebSocket server started")
+	
 	if err != nil {
 		log.Fatal("Failed to start HTTP server:", err)
 	}
