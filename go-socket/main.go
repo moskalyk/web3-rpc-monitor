@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/joho/godotenv"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/handlers"
 )
 
 var (
@@ -30,6 +31,7 @@ var chains []BlockObject
 
 type BlockCountData struct {
 	Counts []*big.Int `json:"counts"`
+	Duration int `json:"duration"`
 }
 
 type BlockObject struct {
@@ -189,8 +191,6 @@ func main() {
 
 		defer conn.Close()
 
-		log.Println("WebSocket client connected block counts:", conn.RemoteAddr())
-
 		// Add new client to the list
 		clientsBlockCounts[conn] = true
 
@@ -210,6 +210,7 @@ func main() {
 
 			data := BlockCountData{
 				Counts: differences,
+				Duration: len(chains),
 			}
 
 			jsonData, err := json.Marshal(data)
@@ -243,6 +244,12 @@ func main() {
 		log.Println("WebSocket client connected:", conn.RemoteAddr())
 		// Add new client to the list
 		clients[conn] = true
+		for {
+			if err != nil {
+				log.Println("Failed to read message from WebSocket client:", err)
+				break
+			}
+		}
 		delete(clients, conn)
 	})
 
@@ -259,14 +266,6 @@ func main() {
 						max = num // Update the maximum value
 					}
 				}
-
-				// Calling Now() method
-				tm := time.Now()
-		
-				// Prints current 
-				// local time in UTC
-				log.Printf("%s", tm)
-
 
 				data := BlockObject{
 					Blocks: chains[len(chains)-1].Blocks,
@@ -349,7 +348,11 @@ func main() {
 		router.HandleFunc("/api/rpc", getRPC).Methods("GET")
 		router.HandleFunc("/api/1hr", getLastHour).Methods("GET")
 		log.Println("REST server started")
-		log.Fatal(http.ListenAndServe(":8000", router))
+
+		allowedOrigins := handlers.AllowedOrigins([]string{"http://localhost:3000"})
+		allowedMethods := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE"})
+
+		log.Fatal(http.ListenAndServe(":8000", handlers.CORS(allowedOrigins, allowedMethods)(router)))
 	}()
 
 	// Websocket

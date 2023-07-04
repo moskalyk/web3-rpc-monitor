@@ -21,10 +21,11 @@ const chartColors = {
 };
 
 let labels: any = []
-let SOCKET_URL = 'ws://localhost:8000'
+let SOCKET_URL = 'ws://localhost:5000'
 const BlockCounts = () => {
   // const socket = io(SOCKET_URL);
   const [data, setData] = React.useState<any>([])
+  const [duration, setDuration] = React.useState<any>(0)
   const [blockCount, setBlockCount] = React.useState<any>(0)
 
   const options = {
@@ -43,16 +44,13 @@ const BlockCounts = () => {
 
   React.useEffect(() => {
 
-    const newSocket = new WebSocket('ws://localhost:5000/ws');
+    const newSocket = new WebSocket('ws://localhost:5000/counts');
 
-    // Set up event handlers for the WebSocket connection
     newSocket.onopen = () => {
       console.log('WebSocket connection established');
     };
 
     newSocket.onmessage = (event) => {
-      // const message = event.data;
-      console.log(JSON.parse(event.data));
       const fullLabels = [
         {
           label: 'Sequence',
@@ -90,98 +88,32 @@ const BlockCounts = () => {
           tension: 0.1,
         }
       ]
-
       const labels = fullLabels.map((label: any) => label.label)
-      
-      // const data0 = {
-      //   labels,
-      //   datasets: [
-      //     {
-      //       label: 'Blocks',
-      //       data: packet.ratios,
-      //       backgroundColor: 'rgba(255, 99, 132, 0.5)',
-      //     }
-      //   ],
-      // };
-      // console.log(packet)
-      // setData(data0)
-      // setBlockCount(packet.blocks)
+      const data0 = {
+        labels,
+        datasets: [
+          {
+            label: 'Blocks',
+            data: JSON.parse(event.data).counts,
+            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+          }
+        ],
+      };
+      setData(data0)
+      setDuration(JSON.parse(event.data).duration)
     };
-
-    // socket.on('data', (packet: any) => {
-    //   console.log(packet)
-    // })
-
-    // socket.on('live', (packet: any) => {
-    //   const fullLabels = [
-    //     {
-    //       label: 'Sequence',
-    //       data: [],
-    //       fill: false,
-    //       borderColor: 'black',
-    //       tension: 0.1,
-    //     },
-    //     {
-    //       label: 'Alchemy',
-    //       data: [],
-    //       fill: false,
-    //       borderColor: 'blue',
-    //       tension: 0.1,
-    //     },
-    //     {
-    //       label: 'Quicknode',
-    //       data: [],
-    //       fill: false,
-    //       borderColor: 'cyan',
-    //       tension: 0.1,
-    //     },
-    //     {
-    //       label: 'Polygon',
-    //       data: [],
-    //       fill: false,
-    //       borderColor: 'purple',
-    //       tension: 0.1,
-    //     },
-    //     {
-    //       label: 'Ankr',
-    //       data: [],
-    //       fill: false,
-    //       borderColor: 'lightblue',
-    //       tension: 0.1,
-    //     }
-    //   ]
-
-    //   const labels = fullLabels.map((label: any) => label.label)
-      
-    //   const data0 = {
-    //     labels,
-    //     datasets: [
-    //       {
-    //         label: 'Blocks',
-    //         data: packet.ratios,
-    //         backgroundColor: 'rgba(255, 99, 132, 0.5)',
-    //       }
-    //     ],
-    //   };
-    //   console.log(packet)
-    //   setData(data0)
-    //   setBlockCount(packet.blocks)
-    // })
   })
-
- 
-
   return(
     <>
-      <p style={{textAlign: 'center', width: '100%'}}>behind during # of blocks {blockCount}</p>{}
+      <p style={{textAlign: 'center', width: '100%'}}>behind during # of blocks {duration}</p>{}
       <Bar options={options} data={data} />
     </>
   )
 }
 
 let count = 0
-function LastDay (props: any) {
-  const socket = io(SOCKET_URL);
+function LastHour (props: any) {
+  // const socket = io(SOCKET_URL);
   const [init, setInit] = React.useState<any>(false)
 
   const [chartData, setChartData] = React.useState<any>({
@@ -232,52 +164,55 @@ function LastDay (props: any) {
     ],
   });
 
-  React.useEffect(() => {
-        socket.on('day', (packet: any) => {
-          console.log(packet.blocks[0])
-      if(!init){
-        console.log('tester ')
-
-          // labels = [...(labels).slice(-1800), new Date().toLocaleTimeString()];
+  const getLastHour = async () => {
+    const res = await fetch('http://localhost:8000/api/1hr')
+    const packet = await res.json()
+    console.log(packet)
+            // labels = [...(labels).slice(-1800), new Date().toLocaleTimeString()];
         // console.log(chartData)
-        if(count <= 0){
           setChartData({
             labels: packet.time,
             datasets: [
 
               {
                 ...chartData.datasets[0],
-                data: [...chartData.datasets[0].data, ...packet.blocks[0]],
+                data: [...chartData.datasets[0].data, ...packet.blocks["0"]],
               },
               {
                 ...chartData.datasets[1],
-                data: [...chartData.datasets[1].data, ...packet.blocks[1]],
+                data: [...chartData.datasets[1].data, ...packet.blocks["1"]],
               },
               {
                 ...chartData.datasets[2],
-                data: [...chartData.datasets[2].data, ...packet.blocks[2]],
+                data: [...chartData.datasets[2].data, ...packet.blocks["2"]],
               },
               {
                 ...chartData.datasets[3],
-                data: [...chartData.datasets[3].data, ...packet.blocks[3]],
+                data: [...chartData.datasets[3].data, ...packet.blocks["3"]],
               },
               {
                 ...chartData.datasets[4],
-                data: [...chartData.datasets[4].data, ...packet.blocks[4]],
+                data: [...chartData.datasets[4].data, ...packet.blocks["4"]],
               },
-              {
-                ...chartData.datasets[5],
-                data: [...chartData.datasets[5].data, ...packet.blocks[5]],
-              }
             ],
           });
-        }
+  }
+
+  React.useEffect(() => {
+        // socket.on('day', (packet: any) => {
+
+      if(!init){
+
+        getLastHour()
+        console.log('tester ')
+
+  
         count++
 
         setInit(true)
       }
 
-        })
+        // })
     }, [init])
   return(
     <>
@@ -345,7 +280,7 @@ function SignUp(props: any) {
 function App() {
   const [init, setInit] = React.useState<any>(false)
   const [nav, setNav] = React.useState<any>(0)
-  const socket = io(SOCKET_URL);
+  // const socket = io(SOCKET_URL);
 
   const [chartData, setChartData] = React.useState<any>({
     labels: [],
@@ -406,6 +341,7 @@ function App() {
     };
 
     newSocket.onmessage = (event) => {
+      console.log(event)
       let packet = JSON.parse(event.data);
         labels = [...(labels).slice(-10), new Date().toLocaleTimeString()];
         setChartData({
@@ -457,7 +393,7 @@ function App() {
         navigator = <BlockCounts />
         break;
       case 2:
-        navigator = <LastDay/>
+        navigator = <LastHour/>
         break;
       case 3:
         navigator = <SignUp/>
