@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/joho/godotenv"
+	"github.com/gorilla/mux"
 )
 
 var (
@@ -25,6 +26,8 @@ var (
 	broadcast = make(chan []byte)
 )
 
+var chains []BlockObject
+
 type BlockCountData struct {
 	Counts []*big.Int `json:"counts"`
 }
@@ -32,6 +35,7 @@ type BlockCountData struct {
 type BlockObject struct {
 	Blocks []*big.Int `json:"blocks"`
 	MaxNumber *big.Int `json:"max"`
+	Time time.Time `json:"time"`
 }
 
 func calculateDifferences(blockObjects []BlockObject) []*big.Int {
@@ -82,6 +86,85 @@ func calculateDifferences(blockObjects []BlockObject) []*big.Int {
 	return differences
 }
 
+func getRPC(w http.ResponseWriter, r *http.Request) {
+
+	rpcs := []string{
+		"SEQUENCE_RPC",
+		"ALCHEMY_RPC",
+		"QUICKNODE_RPC",
+		"POLYGON_RPC",
+		"ANKR_RPC",
+	}
+
+	index := getMaxIndex(chains[len(chains) - 1].Blocks)
+
+	if index == -1 {
+		index = 0;
+	}
+
+	response := map[string]interface{}{
+		"provider": rpcs[index],
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func getMaxIndex(numbers []*big.Int) int {
+	if len(numbers) == 0 {
+		return -1
+	}
+
+	maxIndex := 0
+	maxValue := numbers[0]
+
+	for i := 1; i < len(numbers); i++ {
+		if numbers[i].Cmp(maxValue) == 1 {
+			maxIndex = i
+			maxValue = numbers[i]
+		}
+	}
+
+	return maxIndex
+}
+
+func getLastHour(w http.ResponseWriter, r *http.Request) {
+
+	lastHour := map[string][]*big.Int{
+		"0": []*big.Int{},
+		"1": []*big.Int{},
+		"2": []*big.Int{},
+		"3": []*big.Int{},
+		"4": []*big.Int{},
+	}
+
+	timeLog := []time.Time{}
+
+	for _, blocks := range chains {
+		// log.Println(blocks.Blocks[0])
+		lastHour["0"] = append(lastHour["0"], blocks.Blocks[0])
+		lastHour["1"] = append(lastHour["1"], blocks.Blocks[1])
+		lastHour["2"] = append(lastHour["2"], blocks.Blocks[2])
+		lastHour["3"] = append(lastHour["3"], blocks.Blocks[3])
+		lastHour["4"] = append(lastHour["4"], blocks.Blocks[4])
+		timeLog = append(timeLog, blocks.Time)
+	}
+
+	response := map[string]interface{}{
+		"blocks": lastHour,
+		"time": timeLog,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -95,8 +178,6 @@ func main() {
 		os.Getenv("POLYGON_RPC"),
 		os.Getenv("ANKR_RPC"),
 	}
-	
-	var chains []BlockObject
 
 	// WebSocket endpoint
 	http.HandleFunc("/counts", func(w http.ResponseWriter, r *http.Request) {
@@ -179,9 +260,18 @@ func main() {
 					}
 				}
 
+				// Calling Now() method
+				tm := time.Now()
+		
+				// Prints current 
+				// local time in UTC
+				log.Printf("%s", tm)
+
+
 				data := BlockObject{
 					Blocks: chains[len(chains)-1].Blocks,
 					MaxNumber: max,
+					Time: time.Now(),
 				}
 
 				jsonData, err := json.Marshal(data)
@@ -240,6 +330,7 @@ func main() {
 			data := BlockObject{
 				Blocks: blocks,
 				MaxNumber: max,
+				Time: time.Now(),
 			}
 
 			chains = append(chains, data)
@@ -249,8 +340,23 @@ func main() {
 		}
 	}()
 
+
+
+	go func(){
+
+		// REST Server for most pace
+		router := mux.NewRouter()
+		router.HandleFunc("/api/rpc", getRPC).Methods("GET")
+		router.HandleFunc("/api/1hr", getLastHour).Methods("GET")
+		log.Println("REST server started")
+		log.Fatal(http.ListenAndServe(":8000", router))
+	}()
+
+	// Websocket
+	// log.Println("WebSocket server started")
 	err = http.ListenAndServe(":5000", nil)
 	log.Println("WebSocket server started")
+
 	
 	if err != nil {
 		log.Fatal("Failed to start HTTP server:", err)
