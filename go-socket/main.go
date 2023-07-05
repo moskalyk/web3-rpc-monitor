@@ -172,7 +172,7 @@ func getLastHour(w http.ResponseWriter, r *http.Request) {
 }
 
 func createTableIfNotExists() {
-	db, err := sql.Open("postgres", "postgres://mm:password@localhost/monitor?sslmode=disable")
+	db, err := sql.Open("postgres", "postgres://"+os.Getenv("PG_USERNAME")+":"+os.Getenv("PG_PASSWORD")+"@localhost/monitor?sslmode=disable")
 
 	if err != nil {
 		log.Fatal(err)
