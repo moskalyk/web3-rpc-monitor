@@ -21,7 +21,6 @@ const chartColors = {
 };
 
 let labels: any = []
-let SOCKET_URL = 'ws://localhost:5000'
 const BlockCounts = () => {
   // const socket = io(SOCKET_URL);
   const [data, setData] = React.useState<any>([])
@@ -324,7 +323,7 @@ function App() {
   React.useEffect(() => {
     if(!init){
 
-    const newSocket = new WebSocket('ws://localhost:5000/ws');
+    const newSocket = new WebSocket('ws://localhost:5000/live');
 
     // Set up event handlers for the WebSocket connection
     newSocket.onopen = () => {

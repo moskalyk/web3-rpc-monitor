@@ -340,7 +340,7 @@ func main() {
 
 
 	// WebSocket endpoint
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("Failed to upgrade WebSocket connection:", err)
@@ -452,7 +452,7 @@ func main() {
 
 		// REST Server for most pace
 		router := mux.NewRouter()
-		router.HandleFunc("/api/rpc", getRPC).Methods("GET")
+		router.HandleFunc("/api/rpc/latest", getRPC).Methods("GET")
 		router.HandleFunc("/api/1hr", getLastHour).Methods("GET")
 		router.HandleFunc("/api/notify/{phone_number}", addPhoneNumber).Methods("GET")
 
