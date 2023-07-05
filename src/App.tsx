@@ -238,16 +238,7 @@ function SignUp(props: any) {
     console.log(number)
     if(isValidPhoneNumber(number)){
       console.log('is valid')
-      const res = await fetch('http://localhost:4000/signUp', {
-        method: "post",
-        headers: {
-            "content-type": "application/json",
-          },
-        //make sure to serialize your JSON body
-        body: JSON.stringify({
-          number: number,
-        })
-      })
+      const res = await fetch(`http://localhost:8000/api/notify/${number}`)
       if(res.status == 200){
         setSuccess(<span className="title">success <br/><br/> expect to receive a notification when blocks are behind by 20<br/><br/>with a cool down of 10 min</span>)
         setError(null)
