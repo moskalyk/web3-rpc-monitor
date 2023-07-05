@@ -21,6 +21,9 @@ const chartColors = {
 };
 
 let labels: any = []
+let socket_url = 'ws://137.220.54.108:5000'
+let rest_url = 'http://137.220.54.108:8000'
+
 const BlockCounts = () => {
   // const socket = io(SOCKET_URL);
   const [data, setData] = React.useState<any>([])
@@ -43,7 +46,7 @@ const BlockCounts = () => {
 
   React.useEffect(() => {
 
-    const newSocket = new WebSocket('ws://localhost:5000/counts');
+    const newSocket = new WebSocket(`${socket_url}/counts`);
 
     newSocket.onopen = () => {
       console.log('WebSocket connection established');
@@ -164,7 +167,7 @@ function LastHour (props: any) {
   });
 
   const getLastHour = async () => {
-    const res = await fetch('http://localhost:8000/api/1hr')
+    const res = await fetch(`${rest_url}/api/1hr`)
     const packet = await res.json()
     console.log(packet)
             // labels = [...(labels).slice(-1800), new Date().toLocaleTimeString()];
@@ -198,20 +201,11 @@ function LastHour (props: any) {
   }
 
   React.useEffect(() => {
-        // socket.on('day', (packet: any) => {
-
       if(!init){
 
         getLastHour()
-        console.log('tester ')
-
-  
-        count++
-
         setInit(true)
       }
-
-        // })
     }, [init])
   return(
     <>
@@ -237,7 +231,7 @@ function SignUp(props: any) {
     console.log(number)
     if(isValidPhoneNumber(number)){
       console.log('is valid')
-      const res = await fetch(`http://localhost:8000/api/notify/${number}`)
+      const res = await fetch(`${rest_url}/api/notify/${number}`)
       if(res.status == 200){
         setSuccess(<span className="title">success <br/><br/> expect to receive a notification when blocks are behind by 20<br/><br/>with a cool down of 10 min</span>)
         setError(null)
@@ -323,7 +317,7 @@ function App() {
   React.useEffect(() => {
     if(!init){
 
-    const newSocket = new WebSocket('ws://localhost:5000/live');
+    const newSocket = new WebSocket(`${socket_url}/live`);
 
     // Set up event handlers for the WebSocket connection
     newSocket.onopen = () => {
