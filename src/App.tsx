@@ -171,7 +171,7 @@ function LastHour (props: any) {
             // labels = [...(labels).slice(-1800), new Date().toLocaleTimeString()];
         // console.log(chartData)
           setChartData({
-            labels: packet.time,
+            labels: packet.time.map((time: any) => time.slice(11,19)),
             datasets: [
 
               {

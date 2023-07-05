@@ -10,9 +10,13 @@ import (
 	"github.com/gorilla/websocket"
 	"math/big"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/twilio/twilio-go"
+	twilioApi "github.com/twilio/twilio-go/rest/api/v2010"
 	"github.com/joho/godotenv"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/handlers"
+	"database/sql"
+	_ "github.com/lib/pq"
 )
 
 var (
@@ -167,6 +171,108 @@ func getLastHour(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func createTableIfNotExists() {
+	db, err := sql.Open("postgres", "postgres://mm:password@localhost/monitor?sslmode=disable")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Prepare the SQL query to check if the table exists
+	query1 := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM   pg_tables
+			WHERE  schemaname = 'public'
+			AND    tablename = 'occurences'
+		);
+	`
+
+	// Execute the query and retrieve the result
+	var exists1 bool
+	err = db.QueryRow(query1).Scan(&exists1)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Check the result
+	if exists1 {
+		log.Println("Table of block occurrences exists!")
+	} else {
+		log.Println("Table does not exist!")
+
+		createTableQuery := `
+			CREATE TABLE IF NOT EXISTS occurences (
+				id SERIAL PRIMARY KEY,
+				behind BOOLEAN
+			);
+		`
+		// Execute the create table query
+		_, err = db.Exec(createTableQuery)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println("Table added!")
+	}
+
+	// Prepare the SQL query to check if the table exists
+	query2 := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM   pg_tables
+			WHERE  schemaname = 'public'
+			AND    tablename = 'numbers'
+		);
+	`
+
+	// Execute the query and retrieve the result
+	var exists2 bool
+	err = db.QueryRow(query2).Scan(&exists2)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Check the result
+	if exists2 {
+		log.Println("Table of phone numbers exists!")
+	} else {
+		log.Println("Table does not exist!")
+
+		createTableQuery := `
+			CREATE TABLE IF NOT EXISTS numbers (
+				id SERIAL PRIMARY KEY,
+				number VARCHAR
+			);
+		`
+		// Execute the create table query
+		_, err = db.Exec(createTableQuery)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println("Table added!")
+	}
+}
+
+func addPhoneNumber(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	phoneNumber := vars["phone_number"]
+
+	db, err := sql.Open("postgres", "postgres://"+os.Getenv("PG_USERNAME")+":"+os.Getenv("PG_PASSWORD")+"@localhost/monitor?sslmode=disable")
+
+	// Prepare the SQL statement
+	query := "INSERT INTO numbers (number) VALUES ($1);"
+
+	// Execute the query
+	_, err = db.Exec(query, phoneNumber)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Use the parameter value as needed
+	log.Println("Added phone Number: %s", phoneNumber)
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -318,11 +424,12 @@ func main() {
 				blocks = append(blocks, blockNumber)
 			}
 
-			max := blocks[0] // Assume the first element as the initial maximum
+			// get max
+			max := blocks[0]
 
 			for _, num := range blocks {
 				if num.Cmp(max) == 1 {
-					max = num // Update the maximum value
+					max = num
 				}
 			}
 
@@ -347,6 +454,8 @@ func main() {
 		router := mux.NewRouter()
 		router.HandleFunc("/api/rpc", getRPC).Methods("GET")
 		router.HandleFunc("/api/1hr", getLastHour).Methods("GET")
+		router.HandleFunc("/api/notify/{phone_number}", addPhoneNumber).Methods("GET")
+
 		log.Println("REST server started")
 
 		allowedOrigins := handlers.AllowedOrigins([]string{"http://localhost:3000"})
@@ -355,11 +464,134 @@ func main() {
 		log.Fatal(http.ListenAndServe(":8000", handlers.CORS(allowedOrigins, allowedMethods)(router)))
 	}()
 
+	go func(){
+		// create a table if one does not exist
+		createTableIfNotExists()
+
+		// connect to db
+		db, err := sql.Open("postgres", "postgres://"+os.Getenv("PG_USERNAME")+":"+os.Getenv("PG_PASSWORD")+"@localhost/monitor?sslmode=disable")
+
+		for {
+			// Prepare the SQL statement
+			query := "SELECT * FROM occurences ORDER BY id DESC LIMIT 1;"
+
+			// Execute the query
+			row := db.QueryRow(query)
+
+			// Scan the result into variables
+			var id string
+			var behind string
+			// Add more variables to match the columns in your table
+
+			err = row.Scan(&id, &behind)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// Process the retrieved data
+			if(len(chains) > 0 && behind == "false"){
+				// Call your function here
+				log.Println("running.")
+
+				diff := big.NewInt(0)
+				threshold := big.NewInt(20)
+
+				diff.Sub(chains[len(chains)-1].MaxNumber, chains[len(chains)-1].Blocks[0])
+
+				if(diff.Cmp(threshold) == 1){
+					if err != nil {
+						log.Fatal(err)
+					}
+					defer db.Close()
+
+					// Prepare the SQL statement
+					query := "INSERT INTO occurences (behind) VALUES ($1);"
+
+					// Execute the query
+					_, err = db.Exec(query, true)
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					accountSid := os.Getenv("TWILIO_ACCOUNT_SID")
+					authToken := os.Getenv("TWILIO_AUTH_TOKEN")
+		
+					client := twilio.NewRestClientWithParams(twilio.ClientParams{
+						Username: accountSid,
+						Password: authToken,
+					})
+
+					// get all phone numbers
+					query1 := "SELECT * FROM numbers;"
+
+					rows, err := db.Query(query1)
+					if err != nil {
+						log.Fatal(err)
+					}
+					defer rows.Close()
+
+					// Iterate over the rows
+					for rows.Next() {
+						// Define variables to store the row values
+						var id int
+						var number string
+						// Add more variables to match the columns in the table
+
+						// Scan the row values into the variables
+						err := rows.Scan(&id, &number)
+						if err != nil {
+							log.Fatal(err)
+						}
+
+						params := &twilioApi.CreateMessageParams{}
+						params.SetTo(number)
+						params.SetFrom("+16727020100")
+						params.SetBody("Sequence Node Gateway is behind by " + diff.String())
+			
+						resp, err := client.Api.CreateMessage(params)
+						if err != nil {
+							log.Println("Error sending SMS message: " + err.Error())
+						} else {
+							response, _ := json.Marshal(*resp)
+							log.Println("Response: " + string(response))
+						}
+
+						log.Println("Boolean value inserted successfully!")
+
+						// Process the row data
+						// Add more processing logic as per your requirements
+					}
+
+					// Check for any errors encountered during iteration
+					err = rows.Err()
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					go func() {
+						time.Sleep(60 * 5 * time.Second)
+						// Prepare the SQL statement
+						query := "INSERT INTO occurences (behind) VALUES ($1);"
+
+						// Execute the query
+						_, err = db.Exec(query, false)
+						if err != nil {
+							log.Fatal(err)
+						}
+						log.Println("resetting")
+					}()
+				}
+
+				// Sleep for 10 seconds
+			}
+			time.Sleep(2 * time.Second)
+		}
+
+	}()
+
 	// Websocket
-	// log.Println("WebSocket server started")
 	err = http.ListenAndServe(":5000", nil)
 	log.Println("WebSocket server started")
-
 	
 	if err != nil {
 		log.Fatal("Failed to start HTTP server:", err)
