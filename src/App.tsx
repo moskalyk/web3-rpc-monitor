@@ -21,11 +21,16 @@ const chartColors = {
 };
 
 let labels: any = []
+// let socket_url = 'ws://localhost:5000'
 let socket_url = 'ws://137.220.54.108:5000'
+
+// let rest_url = 'http://localhost:8000'
 let rest_url = 'http://137.220.54.108:8000'
+
 
 const BlockCounts = () => {
   // const socket = io(SOCKET_URL);
+  const [init, setInit] = React.useState<any>(false)
   const [data, setData] = React.useState<any>([])
   const [duration, setDuration] = React.useState<any>(0)
   const [blockCount, setBlockCount] = React.useState<any>(0)
@@ -46,65 +51,69 @@ const BlockCounts = () => {
 
   React.useEffect(() => {
 
-    const newSocket = new WebSocket(`${socket_url}/counts`);
+    if(!init){
+      const newSocket = new WebSocket(`${socket_url}/counts`);
 
-    newSocket.onopen = () => {
-      console.log('WebSocket connection established');
-    };
-
-    newSocket.onmessage = (event) => {
-      const fullLabels = [
-        {
-          label: 'Sequence',
-          data: [],
-          fill: false,
-          borderColor: 'black',
-          tension: 0.1,
-        },
-        {
-          label: 'Alchemy',
-          data: [],
-          fill: false,
-          borderColor: 'blue',
-          tension: 0.1,
-        },
-        {
-          label: 'Quicknode',
-          data: [],
-          fill: false,
-          borderColor: 'cyan',
-          tension: 0.1,
-        },
-        {
-          label: 'Polygon',
-          data: [],
-          fill: false,
-          borderColor: 'purple',
-          tension: 0.1,
-        },
-        {
-          label: 'Ankr',
-          data: [],
-          fill: false,
-          borderColor: 'lightblue',
-          tension: 0.1,
-        }
-      ]
-      const labels = fullLabels.map((label: any) => label.label)
-      const data0 = {
-        labels,
-        datasets: [
-          {
-            label: 'Blocks',
-            data: JSON.parse(event.data).counts,
-            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-          }
-        ],
+      newSocket.onopen = () => {
+        console.log('WebSocket connection established');
       };
-      setData(data0)
-      setDuration(JSON.parse(event.data).duration)
-    };
+
+      newSocket.onmessage = (event) => {
+        const fullLabels = [
+          {
+            label: 'Sequence',
+            data: [],
+            fill: false,
+            borderColor: 'black',
+            tension: 0.1,
+          },
+          {
+            label: 'Alchemy',
+            data: [],
+            fill: false,
+            borderColor: 'blue',
+            tension: 0.1,
+          },
+          {
+            label: 'Quicknode',
+            data: [],
+            fill: false,
+            borderColor: 'cyan',
+            tension: 0.1,
+          },
+          {
+            label: 'Polygon',
+            data: [],
+            fill: false,
+            borderColor: 'purple',
+            tension: 0.1,
+          },
+          {
+            label: 'Ankr',
+            data: [],
+            fill: false,
+            borderColor: 'lightblue',
+            tension: 0.1,
+          }
+        ]
+        const labels = fullLabels.map((label: any) => label.label)
+        const data0 = {
+          labels,
+          datasets: [
+            {
+              label: 'Blocks',
+              data: JSON.parse(event.data).counts,
+              backgroundColor: 'rgba(255, 99, 132, 0.5)',
+            }
+          ],
+        };
+        setData(data0)
+        setDuration(JSON.parse(event.data).duration)
+      };
+      setInit(true)
+    }
   })
+
   return(
     <>
       <p style={{textAlign: 'center', width: '100%'}}>behind during # of blocks {duration}</p>{}

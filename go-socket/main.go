@@ -493,7 +493,7 @@ func main() {
 
 		log.Println("REST server started")
 
-		allowedOrigins := handlers.AllowedOrigins([]string{"http://137.220.54.108:2000"})
+		allowedOrigins := handlers.AllowedOrigins([]string{"http://137.220.54.108:2000","http://localhost:3000"})
 		allowedMethods := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE"})
 
 		log.Fatal(http.ListenAndServe(":8000", handlers.CORS(allowedOrigins, allowedMethods)(router)))
