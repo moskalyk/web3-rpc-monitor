@@ -44,6 +44,12 @@ type BlockObject struct {
 	Time time.Time `json:"time"`
 }
 
+type Result struct {
+    Checks struct {
+        LastBlockNum *big.Int `json:"lastBlockNum"`
+    } `json:"checks"`
+}
+
 func calculateDifferences(blockObjects []BlockObject) []*big.Int {
 	differences := make([]*big.Int, 0)
 
@@ -273,6 +279,31 @@ func addPhoneNumber(w http.ResponseWriter, r *http.Request) {
 	log.Println("Added phone Number: %s", phoneNumber)
 }
 
+func getSequenceIndexerLatest() *big.Int {
+	response, err := http.Get("https://polygon-indexer.sequence.app/status")
+
+	if err != nil {
+		log.Println(err)
+		log.Println("Error occurred while making the HTTP request:", err)
+		return big.NewInt(-1)
+	}
+
+	defer response.Body.Close()
+
+	// Parse JSON response
+	var result Result
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		log.Println("Error occurred while decoding JSON:", err)
+		return big.NewInt(-1)
+	}
+
+	// Access the parsed data
+	lastBlockNum := result.Checks.LastBlockNum
+
+	return lastBlockNum
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -424,6 +455,10 @@ func main() {
 				blocks = append(blocks, blockNumber)
 			}
 
+			// make sequence indexer status request
+			lastBlockNum := getSequenceIndexerLatest()
+			blocks = append(blocks, lastBlockNum)
+
 			// get max
 			max := blocks[0]
 
@@ -458,7 +493,7 @@ func main() {
 
 		log.Println("REST server started")
 
-		allowedOrigins := handlers.AllowedOrigins([]string{"http://localhost:3000"})
+		allowedOrigins := handlers.AllowedOrigins([]string{"http://137.220.54.108:2000"})
 		allowedMethods := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE"})
 
 		log.Fatal(http.ListenAndServe(":8000", handlers.CORS(allowedOrigins, allowedMethods)(router)))
