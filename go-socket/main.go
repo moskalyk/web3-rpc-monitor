@@ -469,7 +469,7 @@ func main() {
 		createTableIfNotExists()
 
 		// connect to db
-		db, err := sql.Open("postgres", "postgres://"+os.Getenv("PG_USERNAME")+":"+os.Getenv("PG_PASSWORD")+"@localhost/monitor?sslmode=disable")
+		db, _ := sql.Open("postgres", "postgres://"+os.Getenv("PG_USERNAME")+":"+os.Getenv("PG_PASSWORD")+"@localhost/monitor?sslmode=disable")
 
 		for {
 			// Prepare the SQL statement
@@ -483,108 +483,117 @@ func main() {
 			var behind string
 			// Add more variables to match the columns in your table
 
-			err = row.Scan(&id, &behind)
+			err := row.Scan(&id, &behind)
 			if err != nil {
-				log.Fatal(err)
-			}
+				if err == sql.ErrNoRows {
+					log.Println("No rows found in the result set.")
+					// Handle the absence of rows in the result set
+				} else {
+					log.Println("Error occurred while scanning rows:", err)
+					// Handle other errors that may have occurred
+				}
+			} else {
+				// Process the scanned values
+				if(len(chains) > 0 && behind == "false"){
+					// Call your function here
+					log.Println("running.")
 
-			// Process the retrieved data
-			if(len(chains) > 0 && behind == "false"){
-				// Call your function here
-				log.Println("running.")
+					diff := big.NewInt(0)
+					threshold := big.NewInt(20)
 
-				diff := big.NewInt(0)
-				threshold := big.NewInt(20)
+					diff.Sub(chains[len(chains)-1].MaxNumber, chains[len(chains)-1].Blocks[0])
 
-				diff.Sub(chains[len(chains)-1].MaxNumber, chains[len(chains)-1].Blocks[0])
-
-				if(diff.Cmp(threshold) == 1){
-					if err != nil {
-						log.Fatal(err)
-					}
-					defer db.Close()
-
-					// Prepare the SQL statement
-					query := "INSERT INTO occurences (behind) VALUES ($1);"
-
-					// Execute the query
-					_, err = db.Exec(query, true)
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					accountSid := os.Getenv("TWILIO_ACCOUNT_SID")
-					authToken := os.Getenv("TWILIO_AUTH_TOKEN")
-		
-					client := twilio.NewRestClientWithParams(twilio.ClientParams{
-						Username: accountSid,
-						Password: authToken,
-					})
-
-					// get all phone numbers
-					query1 := "SELECT * FROM numbers;"
-
-					rows, err := db.Query(query1)
-					if err != nil {
-						log.Fatal(err)
-					}
-					defer rows.Close()
-
-					// Iterate over the rows
-					for rows.Next() {
-						// Define variables to store the row values
-						var id int
-						var number string
-						// Add more variables to match the columns in the table
-
-						// Scan the row values into the variables
-						err := rows.Scan(&id, &number)
+					if(diff.Cmp(threshold) == 1){
 						if err != nil {
 							log.Fatal(err)
 						}
+						defer db.Close()
 
-						params := &twilioApi.CreateMessageParams{}
-						params.SetTo(number)
-						params.SetFrom("+16727020100")
-						params.SetBody("Sequence Node Gateway is behind by " + diff.String())
-			
-						resp, err := client.Api.CreateMessage(params)
-						if err != nil {
-							log.Println("Error sending SMS message: " + err.Error())
-						} else {
-							response, _ := json.Marshal(*resp)
-							log.Println("Response: " + string(response))
-						}
-
-						log.Println("Boolean value inserted successfully!")
-
-						// Process the row data
-						// Add more processing logic as per your requirements
-					}
-
-					// Check for any errors encountered during iteration
-					err = rows.Err()
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					go func() {
-						time.Sleep(60 * 5 * time.Second)
 						// Prepare the SQL statement
 						query := "INSERT INTO occurences (behind) VALUES ($1);"
 
 						// Execute the query
-						_, err = db.Exec(query, false)
+						_, err = db.Exec(query, true)
 						if err != nil {
 							log.Fatal(err)
 						}
-						log.Println("resetting")
-					}()
-				}
 
-				// Sleep for 10 seconds
+						accountSid := os.Getenv("TWILIO_ACCOUNT_SID")
+						authToken := os.Getenv("TWILIO_AUTH_TOKEN")
+			
+						client := twilio.NewRestClientWithParams(twilio.ClientParams{
+							Username: accountSid,
+							Password: authToken,
+						})
+
+						// get all phone numbers
+						query1 := "SELECT * FROM numbers;"
+
+						rows, err := db.Query(query1)
+						if err != nil {
+							log.Fatal(err)
+						}
+						defer rows.Close()
+
+						// Iterate over the rows
+						for rows.Next() {
+							// Define variables to store the row values
+							var id int
+							var number string
+							// Add more variables to match the columns in the table
+
+							// Scan the row values into the variables
+							err := rows.Scan(&id, &number)
+							if err != nil {
+								log.Fatal(err)
+							}
+
+							params := &twilioApi.CreateMessageParams{}
+							params.SetTo(number)
+							params.SetFrom("+16727020100")
+							params.SetBody("Sequence Node Gateway is behind by " + diff.String())
+				
+							resp, err := client.Api.CreateMessage(params)
+							if err != nil {
+								log.Println("Error sending SMS message: " + err.Error())
+							} else {
+								response, _ := json.Marshal(*resp)
+								log.Println("Response: " + string(response))
+							}
+
+							log.Println("Boolean value inserted successfully!")
+
+							// Process the row data
+							// Add more processing logic as per your requirements
+						}
+
+						// Check for any errors encountered during iteration
+						err = rows.Err()
+						if err != nil {
+							log.Fatal(err)
+						}
+
+						go func() {
+							time.Sleep(60 * 5 * time.Second)
+							// Prepare the SQL statement
+							query := "INSERT INTO occurences (behind) VALUES ($1);"
+
+							// Execute the query
+							_, err = db.Exec(query, false)
+							if err != nil {
+								log.Fatal(err)
+							}
+							log.Println("resetting")
+						}()
+					}
+
+					// Sleep for 10 seconds
+				}
 			}
+
+
 			time.Sleep(2 * time.Second)
+			
 		}
 
 	}()
