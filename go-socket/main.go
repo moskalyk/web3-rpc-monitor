@@ -1,53 +1,55 @@
 package main
 
 import (
-	"os"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log"
-	"net/http"
-	"time"
-	"github.com/gorilla/websocket"
 	"math/big"
+	"net/http"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	"github.com/twilio/twilio-go"
 	twilioApi "github.com/twilio/twilio-go/rest/api/v2010"
-	"github.com/joho/godotenv"
-	"github.com/gorilla/mux"
-	"github.com/gorilla/handlers"
-	"database/sql"
-	_ "github.com/lib/pq"
 )
 
 var (
-	upgrader  = websocket.Upgrader{
+	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			// allowedOrigin := "http://localhost:3000"
 			return true
 		},
 	}
-	clients   = make(map[*websocket.Conn]bool)
-	clientsBlockCounts   = make(map[*websocket.Conn]bool)
-	broadcast = make(chan []byte)
+	clients            = make(map[*websocket.Conn]bool)
+	clientsBlockCounts = make(map[*websocket.Conn]bool)
+	broadcast          = make(chan []byte)
 )
 
 var chains []BlockObject
 
 type BlockCountData struct {
-	Counts []*big.Int `json:"counts"`
-	Duration int `json:"duration"`
+	Counts   []*big.Int `json:"counts"`
+	Duration int        `json:"duration"`
 }
 
 type BlockObject struct {
-	Blocks []*big.Int `json:"blocks"`
-	MaxNumber *big.Int `json:"max"`
-	Time time.Time `json:"time"`
+	Blocks    []*big.Int `json:"blocks"`
+	MaxNumber *big.Int   `json:"max"`
+	Time      time.Time  `json:"time"`
 }
 
 type Result struct {
-    Checks struct {
-        LastBlockNum *big.Int `json:"lastBlockNum"`
-    } `json:"checks"`
+	Checks struct {
+		LastBlockNum *big.Int `json:"lastBlockNum"`
+	} `json:"checks"`
 }
 
 func calculateDifferences(blockObjects []BlockObject) []*big.Int {
@@ -108,10 +110,10 @@ func getRPC(w http.ResponseWriter, r *http.Request) {
 		"ANKR_RPC",
 	}
 
-	index := getMaxIndex(chains[len(chains) - 1].Blocks)
+	index := getMaxIndex(chains[len(chains)-1].Blocks)
 
 	if index == -1 {
-		index = 0;
+		index = 0
 	}
 
 	response := map[string]interface{}{
@@ -167,7 +169,7 @@ func getLastHour(w http.ResponseWriter, r *http.Request) {
 
 	response := map[string]interface{}{
 		"blocks": lastHour,
-		"time": timeLog,
+		"time":   timeLog,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -304,13 +306,32 @@ func getSequenceIndexerLatest() *big.Int {
 	return lastBlockNum
 }
 
+func dialIn(value string, blocks chan<- *big.Int, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	client, err := ethclient.Dial(value)
+	if err != nil {
+		log.Println("Failed to connect to the Ethereum client:", err)
+		return
+	}
+
+	header, err := client.HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		log.Println("Failed to retrieve the latest block header:", err)
+		return
+	}
+
+	blockNumber := header.Number
+	blocks <- blockNumber
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	myArray := []string{
+	provider_urls := []string{
 		os.Getenv("SEQUENCE_RPC"),
 		os.Getenv("ALCHEMY_RPC"),
 		os.Getenv("QUICKNODE_RPC"),
@@ -346,7 +367,7 @@ func main() {
 			differences := calculateDifferences(chains)
 
 			data := BlockCountData{
-				Counts: differences,
+				Counts:   differences,
 				Duration: len(chains),
 			}
 
@@ -365,10 +386,9 @@ func main() {
 				}
 			}
 
-			time.Sleep(2*time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}()
-
 
 	// WebSocket endpoint
 	http.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
@@ -393,7 +413,7 @@ func main() {
 	// Start a goroutine to handle broadcasting messages to clients
 	go func() {
 		for {
-			if(len(chains) > 0){
+			if len(chains) > 0 {
 
 				blocks := chains[len(chains)-1].Blocks
 				max := blocks[0] // Assume the first element as the initial maximum
@@ -405,9 +425,9 @@ func main() {
 				}
 
 				data := BlockObject{
-					Blocks: chains[len(chains)-1].Blocks,
+					Blocks:    chains[len(chains)-1].Blocks,
 					MaxNumber: max,
-					Time: time.Now(),
+					Time:      time.Now(),
 				}
 
 				jsonData, err := json.Marshal(data)
@@ -427,7 +447,7 @@ func main() {
 						delete(clients, client)
 					}
 				}
-				time.Sleep(2*time.Second)
+				time.Sleep(2 * time.Second)
 			}
 		}
 	}()
@@ -436,42 +456,41 @@ func main() {
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			var blocks [] *big.Int
-			for _, value := range myArray {
-				client, err := ethclient.Dial(value)
 
-				if err != nil {
-					log.Println("Failed to connect to the Ethereum client:", err)
-					continue
-				}
+			var wg sync.WaitGroup
+			blocks := make(chan *big.Int, len(provider_urls))
 
-				header, err := client.HeaderByNumber(context.Background(), nil)
-				if err != nil {
-					log.Println("Failed to retrieve the latest block header:", err)
-					continue
-				}
-
-				blockNumber := header.Number
-				blocks = append(blocks, blockNumber)
+			for _, value := range provider_urls {
+				wg.Add(1)
+				go dialIn(value, blocks, &wg)
 			}
+
+			wg.Wait()
+			close(blocks)
 
 			// make sequence indexer status request
 			lastBlockNum := getSequenceIndexerLatest()
-			blocks = append(blocks, lastBlockNum)
+			var blockNumbers []*big.Int
+
+			for block := range blocks {
+				blockNumbers = append(blockNumbers, block)
+			}
+
+			blocksOutOfChannel := append(blockNumbers, lastBlockNum)
 
 			// get max
-			max := blocks[0]
+			max := blocksOutOfChannel[0]
 
-			for _, num := range blocks {
+			for _, num := range blocksOutOfChannel {
 				if num.Cmp(max) == 1 {
 					max = num
 				}
 			}
 
 			data := BlockObject{
-				Blocks: blocks,
+				Blocks:    blocksOutOfChannel,
 				MaxNumber: max,
-				Time: time.Now(),
+				Time:      time.Now(),
 			}
 
 			chains = append(chains, data)
@@ -481,9 +500,7 @@ func main() {
 		}
 	}()
 
-
-
-	go func(){
+	go func() {
 
 		// REST Server for most pace
 		router := mux.NewRouter()
@@ -493,13 +510,13 @@ func main() {
 
 		log.Println("REST server started")
 
-		allowedOrigins := handlers.AllowedOrigins([]string{"http://137.220.54.108:2000","http://localhost:3000"})
+		allowedOrigins := handlers.AllowedOrigins([]string{"http://137.220.54.108:2000", "http://localhost:3000"})
 		allowedMethods := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE"})
 
 		log.Fatal(http.ListenAndServe(":8000", handlers.CORS(allowedOrigins, allowedMethods)(router)))
 	}()
 
-	go func(){
+	go func() {
 		// create a table if one does not exist
 		createTableIfNotExists()
 
@@ -529,7 +546,7 @@ func main() {
 				}
 			} else {
 				// Process the scanned values
-				if(len(chains) > 0 && behind == "false"){
+				if len(chains) > 0 && behind == "false" {
 					// Call your function here
 					log.Println("running.")
 
@@ -538,7 +555,7 @@ func main() {
 
 					diff.Sub(chains[len(chains)-1].MaxNumber, chains[len(chains)-1].Blocks[0])
 
-					if(diff.Cmp(threshold) == 1){
+					if diff.Cmp(threshold) == 1 {
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -555,7 +572,7 @@ func main() {
 
 						accountSid := os.Getenv("TWILIO_ACCOUNT_SID")
 						authToken := os.Getenv("TWILIO_AUTH_TOKEN")
-			
+
 						client := twilio.NewRestClientWithParams(twilio.ClientParams{
 							Username: accountSid,
 							Password: authToken,
@@ -587,7 +604,7 @@ func main() {
 							params.SetTo(number)
 							params.SetFrom("+16727020100")
 							params.SetBody("Sequence Node Gateway is behind by " + diff.String())
-				
+
 							resp, err := client.Api.CreateMessage(params)
 							if err != nil {
 								log.Println("Error sending SMS message: " + err.Error())
@@ -626,9 +643,8 @@ func main() {
 				}
 			}
 
-
 			time.Sleep(2 * time.Second)
-			
+
 		}
 
 	}()
@@ -636,7 +652,7 @@ func main() {
 	// Websocket
 	err = http.ListenAndServe(":5000", nil)
 	log.Println("WebSocket server started")
-	
+
 	if err != nil {
 		log.Fatal("Failed to start HTTP server:", err)
 	}
